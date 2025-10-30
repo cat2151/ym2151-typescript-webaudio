@@ -61,11 +61,11 @@ http://localhost:8080/dist/phase2/index.html
    - DT1/MUL, TL, KS/AR, AMS/D1R, DT2/D2R, D1L/RR
 4. キーオン（全オペレータ）
 
-合計29回のレジスタwriteを行い、各writeで10msの遅延が発生します（合計290ms）。
+合計29回のレジスタwriteを行い、各writeで10msの遅延が発生します（総遅延時間: 290ms）。
 
 ### WebAudio実装
 
-TypeScriptで440Hzのサイン波を生成し、WebAudio APIを使用してブラウザで再生します。
+現在の実装は、YM2151のレジスタ設定をシミュレートし、TypeScriptで直接440Hzのサイン波を生成してWebAudio APIで再生します。Nuked-OPMのC言語コードは参考資料として含まれています。
 
 ## 技術スタック
 
@@ -75,7 +75,9 @@ TypeScriptで440Hzのサイン波を生成し、WebAudio APIを使用してブ�
 
 ## 注意事項
 
-現在の実装では、Nuked-OPMのC言語コードは参考用として含まれていますが、実際の音声生成はTypeScriptで直接実装されています。EmscriptenによるWASMコンパイルが必要な場合は、以下のコマンドでビルドできます:
+この実装は、YM2151/OPMのレジスタ設定とタイミングをシミュレートしたものです。Nuked-OPMのC言語コードは、正確なレジスタ仕様を参照するために含まれています。
+
+将来的にNuked-OPMを直接統合する場合は、EmscriptenでWASMにコンパイルして使用できます:
 
 ```bash
 npm run build:wasm
