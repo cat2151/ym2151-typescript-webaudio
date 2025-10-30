@@ -1,0 +1,25 @@
+{
+  "name": "ym2151-typescript-webaudio",
+  "version": "1.0.0",
+  "description": "YM2151 emulator with TypeScript and WebAudio",
+  "scripts": {
+    "build:wasm": "cd src/phase2 && emcc opm.c -o opm.js -s WASM=1 -s EXPORTED_FUNCTIONS='[\"_OPM_Clock\",\"_OPM_Write\",\"_OPM_Read\",\"_OPM_Reset\",\"_malloc\",\"_free\"]' -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"getValue\",\"setValue\"]' -s MODULARIZE=1 -s EXPORT_NAME='createOPMModule' -O2",
+    "build:ts": "tsc",
+    "build": "npm run build:ts",
+    "serve": "npx http-server -p 8080"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/emscripten": "^1.39.0",
+    "http-server": "^14.1.0"
+  },
+  "keywords": [
+    "ym2151",
+    "opm",
+    "webaudio",
+    "typescript",
+    "emscripten"
+  ],
+  "author": "",
+  "license": "MIT"
+}
