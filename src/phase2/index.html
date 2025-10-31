@@ -85,9 +85,10 @@
         <h1>🎵 YM2151 WebAudio Player</h1>
         
         <div class="info">
-            <h2>Phase 2: Nuked-OPM Implementation</h2>
-            <p>このプログラムは、Nuked-OPMエミュレーターを使用して、440Hzの音声を3秒間演奏します。</p>
+            <h2>Phase 2: Nuked-OPM WASM + AudioWorklet Implementation</h2>
+            <p>このプログラムは、Nuked-OPMエミュレーター（WASM）とAudioWorkletを使用して、440Hzの音声を3秒間演奏します。</p>
             <p>FM音源レジスタのwrite後には、10msのcycle消費を行います。</p>
+            <p><strong>実際のYM2151エミュレーションによるリアルタイム音声合成を実装しています。</strong></p>
         </div>
 
         <div class="specs">
@@ -98,7 +99,7 @@
                 <strong>演奏時間:</strong> 3秒
             </div>
             <div class="spec-item">
-                <strong>プラットフォーム:</strong> WebAudio API
+                <strong>プラットフォーム:</strong> WASM + AudioWorklet
             </div>
             <div class="spec-item">
                 <strong>レジスタ遅延:</strong> 10ms/write
@@ -139,8 +140,8 @@
                 playButton.disabled = true;
                 statusDiv.textContent = '';
                 
-                console.log('=== YM2151 OPM Player Phase 2 ===');
-                console.log('Initializing...\n');
+                console.log('=== YM2151 OPM Player Phase 2 - WASM + AudioWorklet ===');
+                console.log('Initializing WASM and AudioWorklet...\n');
                 
                 player = new OPMPlayer();
                 await player.play();

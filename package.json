@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "YM2151 emulator with TypeScript and WebAudio",
   "scripts": {
-    "build:wasm": "cd src/phase2 && emcc opm.c -o opm.js -s WASM=1 -s EXPORTED_FUNCTIONS='[\"_OPM_Clock\",\"_OPM_Write\",\"_OPM_Read\",\"_OPM_Reset\",\"_malloc\",\"_free\"]' -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"getValue\",\"setValue\"]' -s MODULARIZE=1 -s EXPORT_NAME='createOPMModule' -O2",
+    "build:wasm": "cd src/phase2 && emcc opm.c -o opm.js -s WASM=1 -s EXPORTED_FUNCTIONS='[\"_OPM_Clock\",\"_OPM_Write\",\"_OPM_Read\",\"_OPM_Reset\",\"_malloc\",\"_free\"]' -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"getValue\",\"setValue\"]' -s MODULARIZE=1 -s EXPORT_NAME='createOPMModule' -s ALLOW_MEMORY_GROWTH=1 -O2",
     "build:ts": "tsc",
-    "build": "npm run build:ts",
-    "serve": "npx http-server -p 8080"
+    "build:copy": "cp src/phase2/opm.js dist/phase2/ && cp src/phase2/opm.wasm dist/phase2/ && cp src/phase2/opm-processor.js dist/phase2/ && cp src/phase2/index.html dist/phase2/",
+    "build": "npm run build:ts && npm run build:copy",
+    "serve": "npx http-server -p 8080 -c-1 --cors"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
