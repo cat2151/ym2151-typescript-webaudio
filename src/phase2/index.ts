@@ -1,9 +1,9 @@
 /**
- * YM2151 (OPM) WebAudio Player
- * Generates a 440Hz tone for 3 seconds using WebAudio
+ * YM2151 (OPM) WebAudio Player with WASM and AudioWorklet
+ * Uses Nuked-OPM WASM module with AudioWorklet for real-time synthesis
  * 
- * This implementation simulates FM synthesis register writes
- * with 10ms cycle consumption after each write.
+ * This implementation uses actual YM2151 emulation via WASM
+ * with register writes processed in real-time.
  */
 
 // YM2151 clock frequency
@@ -43,7 +43,9 @@ interface OPMRegisterWrite {
 
 class OPMPlayer {
     private audioContext: AudioContext | null = null;
+    private workletNode: AudioWorkletNode | null = null;
     private registerWrites: OPMRegisterWrite[] = [];
+    private workletReady: boolean = false;
     
     constructor() {
         this.setupRegisters();
@@ -110,30 +112,57 @@ class OPMPlayer {
     }
     
     /**
-     * Generate audio buffer with 440Hz sine wave
+     * Write a register to the OPM worklet
      */
-    private generateAudioBuffer(duration: number): AudioBuffer {
+    private writeRegister(port: number, value: number): void {
+        if (!this.workletNode) {
+            throw new Error('Worklet not initialized');
+        }
+        this.workletNode.port.postMessage({
+            type: 'write',
+            port: port,
+            value: value
+        });
+    }
+    
+    /**
+     * Initialize AudioWorklet
+     */
+    private async initWorklet(): Promise<void> {
         if (!this.audioContext) {
             throw new Error('AudioContext not initialized');
         }
         
-        const sampleRate = this.audioContext.sampleRate;
-        const numSamples = Math.floor(duration * sampleRate);
-        const buffer = this.audioContext.createBuffer(2, numSamples, sampleRate);
+        console.log('Loading AudioWorklet module...');
         
-        const frequency = 440; // Hz
-        const leftChannel = buffer.getChannelData(0);
-        const rightChannel = buffer.getChannelData(1);
+        // Register the AudioWorklet processor
+        await this.audioContext.audioWorklet.addModule('./opm-processor.js');
         
-        // Generate 440Hz sine wave
-        for (let i = 0; i < numSamples; i++) {
-            const t = i / sampleRate;
-            const value = Math.sin(2 * Math.PI * frequency * t) * 0.3; // 0.3 = volume
-            leftChannel[i] = value;
-            rightChannel[i] = value;
-        }
+        console.log('Creating AudioWorklet node...');
         
-        return buffer;
+        // Create the worklet node
+        this.workletNode = new AudioWorkletNode(this.audioContext, 'opm-processor', {
+            numberOfInputs: 0,
+            numberOfOutputs: 1,
+            outputChannelCount: [2] // Stereo output
+        });
+        
+        // Wait for worklet to be initialized
+        await new Promise<void>((resolve, reject) => {
+            this.workletNode!.port.onmessage = (event) => {
+                if (event.data.type === 'initialized') {
+                    console.log('AudioWorklet initialized successfully');
+                    this.workletReady = true;
+                    resolve();
+                } else if (event.data.type === 'error') {
+                    console.error('AudioWorklet error:', event.data.error);
+                    reject(new Error(`AudioWorklet initialization failed: ${event.data.error}`));
+                }
+            };
+        });
+        
+        // Connect to audio output
+        this.workletNode.connect(this.audioContext.destination);
     }
     
     /**
@@ -143,35 +172,35 @@ class OPMPlayer {
         // Initialize AudioContext
         this.audioContext = new AudioContext();
         
-        console.log('Starting OPM playback...');
+        console.log('Starting OPM WASM AudioWorklet playback...');
+        console.log(`Sample Rate: ${this.audioContext.sampleRate}Hz`);
         console.log(`Total register writes: ${this.registerWrites.length}`);
+        
+        // Initialize the AudioWorklet
+        await this.initWorklet();
         
         // Calculate total delay from register writes
         const totalDelay = this.registerWrites.reduce((sum, write) => sum + write.delay, 0);
         console.log(`Total register write delay: ${totalDelay}ms`);
         
-        // Simulate register writes with delays
-        console.log('Writing registers...');
+        // Send register writes to the worklet with delays
+        console.log('Writing registers to WASM OPM...');
         for (let i = 0; i < this.registerWrites.length; i++) {
             const write = this.registerWrites[i];
             console.log(`Write ${i + 1}/${this.registerWrites.length}: Reg 0x${write.address.toString(16).padStart(2, '0')} = 0x${write.data.toString(16).padStart(2, '0')}`);
+            
+            // Write to the worklet
+            this.writeRegister(write.address, write.data);
             
             // Wait 10ms per register write (cycle consumption)
             await this.delay(write.delay);
         }
         
-        console.log('Register writes complete. Starting audio playback...');
+        console.log('Register writes complete. Audio is now playing from WASM OPM...');
         
-        // Generate and play 3 second audio
+        // Play for 3 seconds
         const duration = 3.0; // seconds
-        const buffer = this.generateAudioBuffer(duration);
-        
-        const source = this.audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(this.audioContext.destination);
-        
         console.log(`Playing 440Hz tone for ${duration} seconds...`);
-        source.start(0);
         
         // Wait for playback to complete
         await this.delay(duration * 1000);
@@ -179,6 +208,10 @@ class OPMPlayer {
         console.log('Playback complete.');
         
         // Clean up
+        if (this.workletNode) {
+            this.workletNode.disconnect();
+            this.workletNode = null;
+        }
         await this.audioContext.close();
         this.audioContext = null;
     }

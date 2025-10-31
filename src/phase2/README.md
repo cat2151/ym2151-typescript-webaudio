@@ -1,19 +1,22 @@
-# Phase 2: Nuked-OPM WebAudio Implementation
+# Phase 2: Nuked-OPM WASM + AudioWorklet Implementation
 
-このディレクトリには、Nuked-OPMを使用した440Hz 3秒の音声演奏プログラムが含まれています。
+このディレクトリには、Nuked-OPMをWASMにコンパイルし、AudioWorkletで実行する440Hz 3秒の音声演奏プログラムが含まれています。
 
 ## 概要
 
 - **周波数**: 440Hz (A4音)
 - **演奏時間**: 3秒
-- **プラットフォーム**: WebAudio API
+- **プラットフォーム**: Emscripten WASM + WebAudio AudioWorklet API
 - **レジスタ遅延**: FM音源レジスタwrite後に10msのcycle消費
+- **実装**: 実際のNuked-OPM C言語エミュレータをWASMにコンパイルして使用
 
 ## ファイル構成
 
-- `index.ts` - TypeScript実装のメインファイル
+- `index.ts` - TypeScript実装のメインファイル（AudioWorklet制御）
 - `index.html` - WebAudioプレーヤーのHTML UI
-- `opm.c` / `opm.h` - Nuked-OPMのソースコード（参考用）
+- `opm-processor.js` - AudioWorkletProcessor実装
+- `opm.c` / `opm.h` - Nuked-OPMのソースコード
+- `opm.js` / `opm.wasm` - Emscriptenでコンパイルされたモジュール
 - `LICENSE` - Nuked-OPMのライセンス（LGPL-2.1）
 
 ## ビルド方法
@@ -24,7 +27,10 @@
 # 依存関係のインストール
 npm install
 
-# TypeScriptのビルド
+# WASMモジュールのビルド（初回のみ、またはopm.cを変更した時）
+npm run build:wasm
+
+# TypeScriptのビルドとファイルコピー
 npm run build
 ```
 
@@ -41,7 +47,7 @@ npm run serve
 2. ブラウザで以下のURLを開く:
 
 ```
-http://localhost:8080/dist/phase2/index.html
+http://localhost:8080/phase2/index.html
 ```
 
 3. 「▶ 演奏開始」ボタンをクリックして再生
@@ -63,27 +69,60 @@ http://localhost:8080/dist/phase2/index.html
 
 合計29回のレジスタwriteを行い、各writeで10msの遅延が発生します（総遅延時間: 290ms）。
 
-### WebAudio実装
+### WebAudio AudioWorklet実装
 
-現在の実装は、YM2151のレジスタ設定をシミュレートし、TypeScriptで直接440Hzのサイン波を生成してWebAudio APIで再生します。Nuked-OPMのC言語コードは参考資料として含まれています。
+この実装は、実際のNuked-OPM YM2151エミュレータをEmscriptenでWASMにコンパイルし、AudioWorkletで実行します。
+
+**実装の流れ:**
+
+1. **WASM モジュールのロード**: AudioWorkletProcessor内でNuked-OPMのWASMモジュールをロード
+2. **チップの初期化**: OPM_Reset()でYM2151チップを初期化
+3. **レジスタ書き込み**: メインスレッドからOPM_Write()でレジスタに値を書き込み
+4. **リアルタイム音声生成**: AudioWorklet内でOPM_Clock()を繰り返し呼び出し、音声サンプルを生成
+5. **出力**: 生成されたサンプルをWebAudioの出力バッファに書き込み
+
+**クロックレート:**
+- YM2151: 3.579545 MHz
+- サンプルレート: 44.1 kHz
+- 1サンプルあたり約81クロック実行
 
 ## 技術スタック
 
 - **TypeScript** - メイン言語
-- **WebAudio API** - ブラウザオーディオ再生
-- **Nuked-OPM** - YM2151エミュレータ（参考用に同梱）
+- **WebAudio AudioWorklet API** - リアルタイムオーディオ処理
+- **Emscripten WASM** - C言語エミュレータのコンパイル
+- **Nuked-OPM** - YM2151エミュレータ（C言語実装）
+
+## 実装の詳細
+
+### WASMコンパイル
+
+Emscriptenを使用してNuked-OPMをWASMにコンパイル:
+
+```bash
+emcc opm.c -o opm.js \
+  -s WASM=1 \
+  -s EXPORTED_FUNCTIONS='["_OPM_Clock","_OPM_Write","_OPM_Read","_OPM_Reset","_malloc","_free"]' \
+  -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue"]' \
+  -s MODULARIZE=1 \
+  -s EXPORT_NAME='createOPMModule' \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -O2
+```
+
+### AudioWorklet Processor
+
+`opm-processor.js`は、AudioWorkletProcessorとして動作し、以下を実行:
+
+- WASMモジュールの初期化
+- メインスレッドからのメッセージ受信（レジスタ書き込み）
+- process()メソッド内でOPM_Clock()を呼び出してサンプル生成
 
 ## 注意事項
 
-この実装は、YM2151/OPMのレジスタ設定とタイミングをシミュレートしたものです。Nuked-OPMのC言語コードは、正確なレジスタ仕様を参照するために含まれています。
-
-将来的にNuked-OPMを直接統合する場合は、EmscriptenでWASMにコンパイルして使用できます:
-
-```bash
-npm run build:wasm
-```
-
-（注: Emscripten環境のセットアップが必要です）
+- **Emscripten環境**: WASMのビルドにはEmscriptenが必要です
+- **CORS設定**: AudioWorkletはCORS制約があるため、適切なHTTPサーバー設定が必要
+- **ブラウザ対応**: AudioWorklet APIをサポートするモダンブラウザが必要
 
 ## ライセンス
 
