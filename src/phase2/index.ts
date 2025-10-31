@@ -148,7 +148,7 @@ class OPMPlayer {
         });
         
         // Wait for worklet to be initialized
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
             this.workletNode!.port.onmessage = (event) => {
                 if (event.data.type === 'initialized') {
                     console.log('AudioWorklet initialized successfully');
@@ -156,6 +156,7 @@ class OPMPlayer {
                     resolve();
                 } else if (event.data.type === 'error') {
                     console.error('AudioWorklet error:', event.data.error);
+                    reject(new Error(`AudioWorklet initialization failed: ${event.data.error}`));
                 }
             };
         });

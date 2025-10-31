@@ -7,6 +7,11 @@
 // Note: In AudioWorklet context, we need to use importScripts
 importScripts('./opm.js');
 
+// Constants
+const OPM_CLOCK_HZ = 3579545; // YM2151 clock frequency: 3.579545 MHz
+const OPM_CHIP_MEMORY_SIZE = 4096; // Memory allocation for opm_t structure (conservative estimate)
+const OPM_OUTPUT_SCALE = 32768.0; // YM2151 outputs 16-bit signed integers
+
 class OPMProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
@@ -15,7 +20,9 @@ class OPMProcessor extends AudioWorkletProcessor {
         this.chipPtr = null;
         this.outputBuffer = null;
         this.initialized = false;
-        this.clocksPerSample = 81; // 3579545 Hz / 44100 Hz ≈ 81.175
+        
+        // Calculate clocks per sample based on actual sample rate
+        this.clocksPerSample = Math.round(OPM_CLOCK_HZ / sampleRate);
         
         // Initialize the WASM module
         this.initModule();
@@ -31,9 +38,8 @@ class OPMProcessor extends AudioWorkletProcessor {
             // Create the WASM module
             this.module = await createOPMModule();
             
-            // Allocate memory for the chip state
-            const chipSize = 4096; // Enough space for opm_t structure
-            this.chipPtr = this.module._malloc(chipSize);
+            // Allocate memory for the chip state (opm_t structure)
+            this.chipPtr = this.module._malloc(OPM_CHIP_MEMORY_SIZE);
             
             // Initialize the chip
             this.module._OPM_Reset(this.chipPtr);
@@ -106,8 +112,9 @@ class OPMProcessor extends AudioWorkletProcessor {
                 }
                 
                 // Average and convert to float [-1.0, 1.0]
-                const left = (accumLeft / this.clocksPerSample) / 32768.0;
-                const right = (accumRight / this.clocksPerSample) / 32768.0;
+                // OPM outputs 16-bit signed integers, scale to normalized float
+                const left = (accumLeft / this.clocksPerSample) / OPM_OUTPUT_SCALE;
+                const right = (accumRight / this.clocksPerSample) / OPM_OUTPUT_SCALE;
                 
                 // Write to output channels
                 if (output.length > 0) output[0][i] = left;
